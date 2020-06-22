@@ -18,6 +18,7 @@ int main(int argc, char** argv)
 		err_n_die("Usage: %s <target_ip>", argv[0]);
 
 	int socket_network = socket(AF_INET, SOCK_STREAM, 0);
+
 	if (socket_network < 0)
 		err_n_die("Error while creating the socket!");
 
@@ -32,8 +33,6 @@ int main(int argc, char** argv)
 	if (connect(socket_network, (struct sockaddr*) &servaddr, sizeof(servaddr)) < 0)
 		err_n_die("Error while trying to connect!");
 
-	// char sendline[MAX_LINE];
-	// sprintf(sendline, "GET / HTTP/1.1\r\n\r\n");
 	char* sendline = "GET / HTTP/1.1\r\n\r\n";
 	int sendbytes = strlen(sendline);
 
@@ -43,16 +42,36 @@ int main(int argc, char** argv)
 	char recvline[MAX_LINE];
 	int n;
 
-	while ((n = read(socket_network, recvline, MAX_LINE-1)) > 0)
+	for ( ; ; )
 	{
-		if (n < 0)
-			err_n_die("Error trying to read the socket stream");
+
+		if ((n = read(socket_network, recvline, MAX_LINE-1)) == 0)
+			break;
+
+		if (n == -1)
+			err_n_die("there was an error while trying to read from socket.");
 
 		printf("%s", recvline);
 		memset(recvline, 0, MAX_LINE);
 	}
 
-	exit(0);
+	int shutdown_code = shutdown(socket_network, 2);
+	switch(shutdown_code)
+	{
+		case EBADF:
+			err_n_die("socket is not a valid file descriptor.");
+		case ENOTSOCK:
+			err_n_die("socket is not a socket.");
+		case ENOTCONN:
+			err_n_die("socket is not connected.");
+		default:
+		{
+			if (shutdown_code < 0)
+				err_n_die("error while trying to close connection with socket");
+		}
+	}
+
+	return 0;
 }
 
 void err_n_die(const char *fmt, ...)
